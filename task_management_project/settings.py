@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-import django_heroku
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-!on&bch)@_nt+sn+@e%4=d)900g@-s-djya-ivwlpjag7=19%l
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -148,10 +148,3 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'ik.chidoka@gmail.com'
-EMAIL_HOST_PASSWORD = 'Slikkyy45'
-DEFAULT_FROM_EMAIL = 'Task Manager <ik.chidoka@gmail.com>'
-
-# Activate Django-Heroku.
-django_heroku.settings(locals())
-ALLOWED_HOSTS = ['*']  
