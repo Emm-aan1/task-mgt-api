@@ -4,14 +4,19 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .models import Task
-from .serializers import TaskSerializer, RegisterUserSerializer
+from .serializers import TaskSerializer, RegisterUserSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from django_filters import rest_framework as filters
 from django.core.mail import send_mail
 from django.utils import timezone
+from django.contrib.auth.models import User
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.template.loader import render_to_string
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.hashers import make_password
+
 
 # Create your views here.
-
-
 class RegisterUserView(APIView):
     def post(self, request):
         serializer = RegisterUserSerializer(data=request.data)
@@ -132,3 +137,47 @@ class LogoutView(APIView):
             return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetRequestView(APIView):
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                user = User.objects.get(email=serializer.validated_data['email'])
+                token = default_token_generator.make_token(user)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+                reset_url = f"http://localhost:8000/api/password-reset-confirm/{uid}/{token}/"
+                message = f"Hi {user.username},\n\nUse the link below to reset your password:\n{reset_url}"
+
+                send_mail(
+                    subject="Password Reset Request",
+                    message=message,
+                    from_email=None,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                return Response({'message': 'Password reset email sent.'}, status=status.HTTP_200_OK)
+            except User.DoesNotExist:
+                return Response({'error': 'User with this email does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request, uidb64, token):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                uid = force_str(urlsafe_base64_decode(uidb64))
+                user = User.objects.get(pk=uid)
+
+                if default_token_generator.check_token(user, token):
+                    user.password = make_password(serializer.validated_data['new_password'])
+                    user.save()
+                    return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+                else:
+                    return Response({'error': 'Invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
+            except User.DoesNotExist:
+                return Response({'error': 'User does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
