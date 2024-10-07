@@ -4,7 +4,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .models import Task
-from .serializers import TaskSerializer, RegisterUserSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from .serializers import (
+    TaskSerializer,
+    RegisterUserSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
+)
 from django_filters import rest_framework as filters
 from django.core.mail import send_mail
 from django.utils import timezone
@@ -21,11 +26,17 @@ class RegisterUserView(APIView):
     def post(self, request):
         serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            user = serializer.save()
+            send_mail(
+                subject="Welcome to Task Management!",
+                message=f"Hello {user.username},\n\nThank you for registering with us.",
+                from_email=None,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
             return Response(
                 {"message": "User created successfully"}, status=status.HTTP_201_CREATED
             )
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -79,8 +90,7 @@ class TaskListCreateView(generics.ListCreateAPIView):
     def send_task_created_email(self, task):
         send_mail(
             subject=f'New Task Created: "{task.title}"',
-            message=f'Hello {task.user.username},\n\nA new task "{
-                task.title}" has been created for you with a due date of {task.due_date}.\n\nTask Management Team',
+            message=f'Hello {task.user.username},\n\nA new task "{task.title}" has been created for you with a due date of {task.due_date}.\n\nTask Management Team',
             from_email=None,
             recipient_list=[task.user.email],
             fail_silently=False,
@@ -104,8 +114,7 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
     def send_task_completed_email(self, task):
         send_mail(
             subject=f"Task '{task.title}' has been completed",
-            message=f"Hello {task.user.username}, \n\nYour task '{
-                task.title}' has been marked as completed. \n\nTask Management App",
+            message=f"Hello {task.user.username}, \n\nYour task '{task.title}' has been marked as completed. \n\nTask Management App",
             from_email=None,
             recipient_list=[task.user.email],
             fail_silently=False,
@@ -144,23 +153,31 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                user = User.objects.get(email=serializer.validated_data['email'])
+                user = User.objects.get(email=serializer.validated_data["email"])
                 token = default_token_generator.make_token(user)
                 uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-                reset_url = f"http://localhost:8000/api/password-reset-confirm/{uid}/{token}/"
+                reset_url = (
+                    f"http://localhost:8000/api/password-reset-confirm/{uid}/{token}/"
+                )
                 message = f"Hi {user.username},\n\nUse the link below to reset your password:\n{reset_url}"
 
                 send_mail(
                     subject="Password Reset Request",
-                    message=message,
+                    message=f"Hi {user.username},\n\nUse the link below to reset your password:\n{reset_url}",
                     from_email=None,
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
-                return Response({'message': 'Password reset email sent.'}, status=status.HTTP_200_OK)
+
+                return Response(
+                    {"message": "Password reset email sent."}, status=status.HTTP_200_OK
+                )
             except User.DoesNotExist:
-                return Response({'error': 'User with this email does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "User with this email does not exist."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -173,11 +190,38 @@ class PasswordResetConfirmView(APIView):
                 user = User.objects.get(pk=uid)
 
                 if default_token_generator.check_token(user, token):
-                    user.password = make_password(serializer.validated_data['new_password'])
+                    user.password = make_password(
+                        serializer.validated_data["new_password"]
+                    )
                     user.save()
-                    return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+
+                    message = f"""
+                    Hi {user.username},
+
+                    Your password has been reset successfully. If you did not request this change, please contact our support team immediately.
+
+                    Thank you,
+                    Task Management Support Team
+                    """
+
+                    send_mail(
+                        subject="Password Reset Confirmation",
+                        message=message,
+                        from_email=None,
+                        recipient_list=[user.email],
+                        fail_silently=False,
+                    )
+                    return Response(
+                        {"message": "Password has been reset successfully."},
+                        status=status.HTTP_200_OK,
+                    )
                 else:
-                    return Response({'error': 'Invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(
+                        {"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST
+                    )
             except User.DoesNotExist:
-                return Response({'error': 'User does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "User does not exist."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
