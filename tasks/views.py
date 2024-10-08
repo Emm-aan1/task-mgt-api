@@ -157,9 +157,7 @@ class PasswordResetRequestView(APIView):
                 token = default_token_generator.make_token(user)
                 uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-                reset_url = (
-                    f"http://localhost:8000/api/password-reset-confirm/{uid}/{token}/"
-                )
+                reset_url = f"https://task-mgt-api-xtbk.onrender.com/api/password-reset-confirm/{uid}/{token}/"
                 message = f"Hi {user.username},\n\nUse the link below to reset your password:\n{reset_url}"
 
                 send_mail(
