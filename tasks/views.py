@@ -19,6 +19,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.template.loader import render_to_string
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.hashers import make_password
+from django.template.loader import render_to_string
 
 
 # Create your views here.
@@ -193,14 +194,10 @@ class PasswordResetConfirmView(APIView):
                     )
                     user.save()
 
-                    message = f"""
-                    Hi {user.username},
-
-                    Your password has been reset successfully. If you did not request this change, please contact our support team immediately.
-
-                    Thank you,
-                    Task Management Support Team
-                    """
+                    context = {"username": user.username}
+                    message = render_to_string(
+                        "emails/password_reset_email.html", context
+                    )
 
                     send_mail(
                         subject="Password Reset Confirmation",
@@ -208,6 +205,7 @@ class PasswordResetConfirmView(APIView):
                         from_email=None,
                         recipient_list=[user.email],
                         fail_silently=False,
+                        html_message=message,
                     )
                     return Response(
                         {"message": "Password has been reset successfully."},
